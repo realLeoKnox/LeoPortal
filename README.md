@@ -121,6 +121,25 @@ Leo Portal 是一款基于 **Node.js** 和 **Vanilla CSS** 开发的轻量级、
 
 ---
 
+### 方式三：Docker Compose 一键部署（推荐，极简运维）
+
+使用 Docker Compose 可以更方便地管理容器的端口映射、数据卷挂载和环境变量，无需手动输入长命令。
+
+1. **一键构建并启动服务**
+   在含有 `docker-compose.yml` 的目录下执行：
+   ```bash
+   docker-compose up -d
+   ```
+   *该命令会自动在本地编译 Dockerfile 镜像，并以守护进程（后台）模式启动容器。*
+
+2. **常用管理命令**
+   * **查看运行状态**：`docker-compose ps`
+   * **查看实时日志**：`docker-compose logs -f`
+   * **重启导航服务**：`docker-compose restart`
+   * **停止并删除容器**：`docker-compose down`
+
+---
+
 ## 🔌 Uptime Kuma 状态监控集成指引
 
 1. **Kuma 状态页配置**：
