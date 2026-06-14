@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="site-page-title">导航主页 | Leo Portal</title>
+  <meta name="description" content="收集常用工具、创作资源和个人入口，保持简洁、高效、好访问。">
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Dynamic Theme Configurations Injector -->
+  <style id="custom-theme-styles"></style>
+  
+  <!-- Admin Custom CSS Code Injection -->
+  <style id="admin-custom-css"></style>
+</head>
+<body>
+
+  <div class="portal-layout">
+    
+    <!-- Top Header Bar -->
+    <header class="header-bar">
+      <div class="logo-section">
+        <span class="logo-icon" id="logo-icon-el">⛵</span>
+        <div>
+          <span class="logo-text" id="logo-text">Leo Portal</span>
+          <span class="logo-sub" id="logo-sub-el">快速导航</span>
+        </div>
+      </div>
+      <div class="header-controls">
+        <button class="theme-toggle" id="theme-toggle-btn" title="切换暗黑/白天模式" aria-label="Theme toggle">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <button class="admin-gateway-btn" onclick="location.href='login.html'" title="进入管理后台">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          后台管理
+        </button>
+      </div>
+    </header>
+
+    <!-- Left Sidebar: Profile Details -->
+    <aside class="sidebar-panel">
+      <div class="avatar-wrapper">
+        <div class="avatar-image" id="sidebar-avatar">⛵</div>
+      </div>
+      
+      <h1 class="owner-name" id="sidebar-name">Wnn</h1>
+      <p class="owner-bio" id="sidebar-bio">
+        收集常用工具、创作资源和个人入口，保持简洁、高效、好访问。
+      </p>
+
+      <!-- Digital Clock Widget -->
+      <div class="clock-widget" title="当前本地时间">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span id="digital-clock">00:00:00</span>
+      </div>
+
+      <!-- Quick Social Media Contacts -->
+      <div class="social-icons-row" id="sidebar-socials">
+        <!-- Will be loaded dynamically from DB -->
+      </div>
+
+      <!-- Main Sidebar Link List -->
+      <div class="profile-links-list" id="sidebar-links-list">
+        <!-- Will be loaded dynamically from DB -->
+      </div>
+    </aside>
+
+    <!-- Right Panel: Search Bar, Category Filters & Cards Grid -->
+    <main class="content-panel">
+      
+      <!-- Multi-Engine Search Engine Widget -->
+      <section class="search-widget">
+        <div class="search-select-wrapper">
+          <select class="search-select" id="search-engine-select">
+            <!-- Will be dynamically generated -->
+          </select>
+        </div>
+        <input type="text" class="search-input" id="search-input" placeholder="输入关键字搜索...">
+        <button class="search-submit-btn" id="search-submit-btn">搜索</button>
+      </section>
+
+      <!-- Category Filter Pills -->
+      <nav class="category-tabs-row" id="category-tabs-container">
+        <button class="category-tab-btn active" data-category-id="all">全部</button>
+        <!-- Will be dynamically populated -->
+      </nav>
+
+      <!-- Navigation Cards Grid -->
+      <section class="links-grid" id="links-grid-container">
+        <!-- Will be populated dynamically -->
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
+          正在加载导航站点数据...
+        </div>
+      </section>
+
+      <!-- Footer Copyright -->
+      <footer class="site-footer" id="site-footer"></footer>
+    </main>
+
+  </div>
+
+  <!-- Shared Toast Banner Notification -->
+  <div class="toast-notification" id="toast-banner">
+    <span id="toast-icon"></span>
+    <span id="toast-message"></span>
+  </div>
+
+  <!-- Dynamic script injections container (e.g. Analytics scripts) -->
+  <div id="analytics-scripts-placeholder"></div>
+
+  <script src="js/frontend.js"></script>
+</body>
+</html>
