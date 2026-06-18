@@ -401,11 +401,34 @@
                   <label class="login-label">后台状态轮询周期 (秒，推荐 60 秒)</label>
                   <input type="number" class="form-input" id="kuma-interval" min="10" placeholder="60">
                 </div>
+
+                <div class="login-form-group form-group-full">
+                  <label class="login-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="kuma-ignore-ssl" style="width: 16px; height: 16px; cursor: pointer;">
+                    忽略 SSL 证书错误 (适用于自签名 HTTPS 证书)
+                  </label>
+                </div>
               </div>
               
-              <button type="submit" class="btn btn-primary">
-                🔌 保存监控集成配置
-              </button>
+              <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="submit" class="btn btn-primary">
+                  🔌 保存监控集成配置
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="diagnoseKumaConnection()" style="border-color: rgba(59, 130, 246, 0.3); color: var(--primary);">
+                  🔍 测试连接并诊断
+                </button>
+              </div>
+
+              <!-- Diagnostic Console Container -->
+              <div id="kuma-diagnose-container" style="display: none; margin-top: 15px;">
+                <div class="login-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span>诊断日志控制台:</span>
+                  <button type="button" class="btn" style="padding: 2px 8px; font-size: 11px; height: auto;" onclick="clearDiagnoseLogs()">清空日志</button>
+                </div>
+                <div class="kuma-debug-box">
+                  <ul id="kuma-diagnose-logs" class="kuma-debug-logs"></ul>
+                </div>
+              </div>
             </form>
           </div>
 
@@ -512,6 +535,10 @@
           <div class="login-form-group">
             <label class="login-label">Uptime Kuma 关联监控项名称 (选填，匹配状态页 Monitor Name)</label>
             <input type="text" class="form-input" id="link-form-kuma-monitor" placeholder="如: NAS 或 Router">
+          </div>
+          <div class="login-form-group">
+            <label class="login-label">显示排序权重 (数字越小越靠前)</label>
+            <input type="number" class="form-input" id="link-form-sort" placeholder="默认 0，如 1, 2, 3..." min="0" value="0">
           </div>
         </div>
         <div class="modal-footer">

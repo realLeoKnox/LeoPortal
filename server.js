@@ -3,7 +3,10 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const http = require('http');
+const https = require('https');
 require('dotenv').config();
+
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -123,6 +126,66 @@ function rateLimiter(req, res, next) {
   next();
 }
 
+// Helper: Promise-based HTTP/HTTPS fetch with timeout and SSL verification bypass option
+function fetchJSON(urlStr, options = {}) {
+  return new Promise((resolve, reject) => {
+    let url;
+    try {
+      url = new URL(urlStr);
+    } catch (err) {
+      return reject(new Error('Invalid URL'));
+    }
+
+    const isHttps = url.protocol === 'https:';
+    const lib = isHttps ? https : http;
+
+    const agentOptions = {};
+    if (isHttps && options.rejectUnauthorized !== undefined) {
+      agentOptions.rejectUnauthorized = options.rejectUnauthorized;
+    }
+    const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
+
+    const reqOptions = {
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      agent: agent,
+      timeout: options.timeout || 6000
+    };
+
+    const req = lib.request(urlStr, reqOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error(`Failed to parse JSON response: ${e.message}`));
+          }
+        } else {
+          reject(new Error(`HTTP status code ${res.statusCode}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+
+    if (options.body) {
+      req.write(typeof options.body === 'string' ? options.body : JSON.stringify(options.body));
+    }
+    req.end();
+  });
+}
+
 // Seed configs
 const defaultSearchEngines = [
   { id: 'google', name: 'Google', url: 'https://www.google.com/search?q={query}', placeholder: 'Google 搜索...', sortOrder: 1, isDefault: true },
@@ -142,8 +205,10 @@ const defaultSiteConfig = {
   kumaEnabled: false,
   kumaUrl: '',
   kumaSlug: 'default',
-  kumaInterval: 60
+  kumaInterval: 60,
+  kumaIgnoreSsl: false
 };
+
 
 const defaultThemeConfig = {
   primaryHue: 215,
@@ -206,14 +271,11 @@ async function fetchKumaStatuses() {
 
   try {
     // 1. 获取状态页配置（映射监控项 ID -> 名称）
-    const configResponse = await fetch(configUrl, { signal: AbortSignal.timeout(6000) });
-    if (!configResponse.ok) throw new Error(`获取配置接口异常 ${configResponse.status}`);
-    const configData = await configResponse.json();
+    const configData = await fetchJSON(configUrl, { rejectUnauthorized: !sc.kumaIgnoreSsl, timeout: 6000 });
 
     // 2. 获取心跳状态数据
-    const heartbeatResponse = await fetch(heartbeatUrl, { signal: AbortSignal.timeout(6000) });
-    if (!heartbeatResponse.ok) throw new Error(`获取心跳接口异常 ${heartbeatResponse.status}`);
-    const heartbeatData = await heartbeatResponse.json();
+    const heartbeatData = await fetchJSON(heartbeatUrl, { rejectUnauthorized: !sc.kumaIgnoreSsl, timeout: 6000 });
+
 
     // 解析出所有的 monitor ID 与名称的映射
     const monitors = [];
@@ -303,6 +365,10 @@ function runMigrations() {
       db.siteConfig.kumaInterval = defaultSiteConfig.kumaInterval;
       updated = true;
     }
+    if (db.siteConfig.kumaIgnoreSsl === undefined) {
+      db.siteConfig.kumaIgnoreSsl = false;
+      updated = true;
+    }
     // Upgrade to include custom logo configurations if missing
     if (db.siteConfig.logoIcon === undefined) {
       db.siteConfig.logoIcon = defaultSiteConfig.logoIcon || '⛵';
@@ -319,11 +385,19 @@ function runMigrations() {
     updated = true;
   }
 
-  // Ensure all links have kumaMonitor key
+  // Ensure all links have kumaMonitor key and sortOrder key
   if (db.links) {
-    db.links.forEach(l => {
+    db.links.forEach((l, index) => {
+      let linkUpdated = false;
       if (l.kumaMonitor === undefined) {
         l.kumaMonitor = '';
+        linkUpdated = true;
+      }
+      if (l.sortOrder === undefined) {
+        l.sortOrder = index + 1; // Default to natural position
+        linkUpdated = true;
+      }
+      if (linkUpdated) {
         updated = true;
       }
     });
@@ -367,7 +441,7 @@ function initializeDatabase() {
     },
     profile: {
       name: 'LeoKnox',
-      bio: '收集常用工具、安全入口和个人系统，保持简洁、高效、安全。',
+      bio: '收集常用工具、安全入口 and 个人系统，保持简洁、高效、安全。',
       avatar: '⛵',
       socials: [
         { platform: 'GitHub', icon: '🐙', url: 'https://github.com' }
@@ -377,10 +451,10 @@ function initializeDatabase() {
       { id: '1', name: '常用站点', sortOrder: 1 }
     ],
     links: [
-      { id: '1', categoryId: '1', title: 'GitHub', description: '开源代码托管与协作平台，全球最大的开发者社区。', url: 'https://github.com', status: 'public', clicks: 0, kumaMonitor: '' },
-      { id: '2', categoryId: '1', title: 'Google', description: '干净快捷的信息检索工具与全球最大的搜索引擎。', url: 'https://google.com', status: 'public', clicks: 0, kumaMonitor: '' },
-      { id: '3', categoryId: '1', title: 'YouTube', description: '全球最大的视频分享与影音播放平台。', url: 'https://youtube.com', status: 'public', clicks: 0, kumaMonitor: '' },
-      { id: '4', categoryId: '1', title: 'NodeSeek', description: '高品质 VPS 主机与网络技术交流讨论论坛。', url: 'https://www.nodeseek.com', status: 'public', clicks: 0, kumaMonitor: '' }
+      { id: '1', categoryId: '1', title: 'GitHub', description: '开源代码托管与协作平台，全球最大的开发者社区。', url: 'https://github.com', status: 'public', clicks: 0, kumaMonitor: '', sortOrder: 1 },
+      { id: '2', categoryId: '1', title: 'Google', description: '干净快捷的信息检索工具与全球最大的搜索引擎。', url: 'https://google.com', status: 'public', clicks: 0, kumaMonitor: '', sortOrder: 2 },
+      { id: '3', categoryId: '1', title: 'YouTube', description: '全球最大的视频分享与影音播放平台。', url: 'https://youtube.com', status: 'public', clicks: 0, kumaMonitor: '', sortOrder: 3 },
+      { id: '4', categoryId: '1', title: 'NodeSeek', description: '高品质 VPS 主机与网络技术交流讨论论坛。', url: 'https://www.nodeseek.com', status: 'public', clicks: 0, kumaMonitor: '', sortOrder: 4 }
     ],
     searchEngines: defaultSearchEngines,
     siteConfig: defaultSiteConfig,
@@ -391,6 +465,7 @@ function initializeDatabase() {
   };
 
   saveDatabaseSync();
+
 }
 
 // Initialize database & start background polling
@@ -423,7 +498,7 @@ app.get('/api/data', (req, res) => {
   const publicData = {
     profile: db.profile,
     categories: [...db.categories].sort((a, b) => a.sortOrder - b.sortOrder),
-    links: linksWithStatuses,
+    links: [...linksWithStatuses].sort((a, b) => (parseInt(a.sortOrder) || 0) - (parseInt(b.sortOrder) || 0)),
     searchEngines: [...(db.searchEngines || defaultSearchEngines)].sort((a, b) => a.sortOrder - b.sortOrder),
     siteConfig: db.siteConfig || defaultSiteConfig,
     themeConfig: db.themeConfig || defaultThemeConfig,
@@ -507,7 +582,7 @@ app.get('/api/admin/data', authenticateAdmin, (req, res) => {
   res.json({
     profile: db.profile,
     categories: db.categories,
-    links: db.links,
+    links: [...db.links].sort((a, b) => (parseInt(a.sortOrder) || 0) - (parseInt(b.sortOrder) || 0)),
     searchEngines: db.searchEngines || defaultSearchEngines,
     siteConfig: db.siteConfig || defaultSiteConfig,
     themeConfig: db.themeConfig || defaultThemeConfig,
@@ -526,7 +601,8 @@ app.post('/api/admin/update', authenticateAdmin, (req, res) => {
       siteConfig.kumaEnabled !== db.siteConfig.kumaEnabled ||
       siteConfig.kumaUrl !== db.siteConfig.kumaUrl ||
       siteConfig.kumaSlug !== db.siteConfig.kumaSlug ||
-      siteConfig.kumaInterval !== db.siteConfig.kumaInterval
+      siteConfig.kumaInterval !== db.siteConfig.kumaInterval ||
+      siteConfig.kumaIgnoreSsl !== db.siteConfig.kumaIgnoreSsl
     ) {
       kumaChanged = true;
     }
@@ -544,7 +620,8 @@ app.post('/api/admin/update', authenticateAdmin, (req, res) => {
       return {
         ...newLink,
         clicks: oldLink ? oldLink.clicks : (newLink.clicks || 0),
-        kumaMonitor: newLink.kumaMonitor !== undefined ? newLink.kumaMonitor : (oldLink ? oldLink.kumaMonitor : '')
+        kumaMonitor: newLink.kumaMonitor !== undefined ? newLink.kumaMonitor : (oldLink ? oldLink.kumaMonitor : ''),
+        sortOrder: newLink.sortOrder !== undefined ? (parseInt(newLink.sortOrder) || 0) : (oldLink && oldLink.sortOrder !== undefined ? oldLink.sortOrder : 0)
       };
     });
   }
@@ -628,6 +705,119 @@ app.post('/api/admin/restore', authenticateAdmin, (req, res) => {
   startKumaFetchLoop(); // Reload monitor loops with restored configs
   res.json({ success: true });
 });
+
+// 12. Test Uptime Kuma Connection and Diagnostics
+app.post('/api/admin/kuma/test-connection', authenticateAdmin, async (req, res) => {
+  const { kumaUrl, kumaSlug, kumaIgnoreSsl } = req.body;
+  const logs = [];
+  
+  const addLog = (msg) => {
+    const time = new Date().toLocaleTimeString();
+    logs.push(`[${time}] ${msg}`);
+  };
+
+  addLog(`开始诊断连接到 Uptime Kuma...`);
+  addLog(`URL: ${kumaUrl}, Slug: ${kumaSlug}, 忽略 SSL 证书错误: ${kumaIgnoreSsl ? '是' : '否'}`);
+
+  if (!kumaUrl || !kumaSlug) {
+    addLog(`错误: Kuma 地址或 Slug 不能为空`);
+    return res.json({ success: false, logs });
+  }
+
+  let kumaUrlClean = kumaUrl.trim();
+  let slug = kumaSlug.trim();
+
+  // Robust parsing 1: If user pasted full status page URL into kumaUrl field
+  if (kumaUrlClean.includes('/status/')) {
+    const parts = kumaUrlClean.split('/status/');
+    kumaUrlClean = parts[0];
+    if (!slug || slug === 'default' || slug === 'status/test') {
+      slug = parts[1];
+    }
+    addLog(`自动解析 Kuma URL 中的状态页路径 -> 基础 URL: ${kumaUrlClean}, Slug: ${slug}`);
+  }
+
+  // Robust parsing 2: If slug contains 'status/'
+  if (slug.includes('status/')) {
+    const parts = slug.split('status/');
+    slug = parts[parts.length - 1];
+    addLog(`自动解析 Slug 中的路径 -> 新 Slug: ${slug}`);
+  }
+
+  // Robust parsing 3: If user pasted full URL into slug field
+  if (slug.startsWith('http://') || slug.startsWith('https://')) {
+    try {
+      const parsed = new URL(slug);
+      kumaUrlClean = parsed.origin;
+      const pathParts = parsed.pathname.split('status/');
+      if (pathParts.length > 1) {
+        slug = pathParts[1];
+      } else {
+        slug = parsed.pathname.replace(/^\//, '');
+      }
+      addLog(`自动解析 Slug 字段内的完整 URL -> 基础 URL: ${kumaUrlClean}, Slug: ${slug}`);
+    } catch (e) {
+      addLog(`解析 Slug URL 时出错: ${e.message}`);
+    }
+  }
+
+  kumaUrlClean = kumaUrlClean.replace(/\/$/, '');
+  slug = slug.replace(/\/$/, '');
+
+  const configUrl = `${kumaUrlClean}/api/status-page/${slug}`;
+  const heartbeatUrl = `${kumaUrlClean}/api/status-page/heartbeat/${slug}`;
+
+  // 1. 测试配置接口
+  addLog(`步骤 1/4: 正在获取状态页配置: ${configUrl}`);
+  try {
+    const start = Date.now();
+    const configData = await fetchJSON(configUrl, { rejectUnauthorized: !kumaIgnoreSsl, timeout: 6000 });
+    const duration = Date.now() - start;
+    addLog(`成功获取配置! 耗时: ${duration}ms`);
+    
+    const monitors = [];
+    const publicGroupList = configData.publicGroupList || [];
+    publicGroupList.forEach(group => {
+      const groupMonitors = group.monitorList || [];
+      groupMonitors.forEach(m => {
+        monitors.push({ id: m.id, name: m.name });
+      });
+    });
+    addLog(`成功解析状态页配置，包含 ${monitors.length} 个监控项`);
+    
+    // 2. 测试心跳接口
+    addLog(`步骤 2/4: 正在获取心跳状态数据: ${heartbeatUrl}`);
+    const startHb = Date.now();
+    const heartbeatData = await fetchJSON(heartbeatUrl, { rejectUnauthorized: !kumaIgnoreSsl, timeout: 6000 });
+    const durationHb = Date.now() - startHb;
+    addLog(`成功获取心跳! 耗时: ${durationHb}ms`);
+
+    const heartbeatList = heartbeatData.heartbeatList || {};
+    let matchedCount = 0;
+    monitors.forEach(m => {
+      if (heartbeatList[m.id] && heartbeatList[m.id].length > 0) {
+        matchedCount++;
+      }
+    });
+    addLog(`步骤 3/4: 分析状态数据，匹配到心跳记录的监控项数量: ${matchedCount} / ${monitors.length}`);
+    
+    addLog(`步骤 4/4: 诊断完成。连接正常，Uptime Kuma 运行良好。`);
+    res.json({ success: true, logs });
+  } catch (err) {
+    addLog(`连接测试失败! 异常信息: ${err.message}`);
+    if (err.code === 'DEPTH_ZERO_SELF_SIGNED_CERT' || err.message.includes('self signed certificate')) {
+      addLog(`建议: 检测到自签名证书错误。如果您使用的是自签名证书，请启用“忽略 SSL 证书错误”复选框并保存后重试。`);
+    } else if (err.code === 'ENOTFOUND') {
+      addLog(`建议: 无法解析域名。请检查 Uptime Kuma 域名/IP 是否拼写正确，或检查服务器的 DNS 配置。`);
+    } else if (err.code === 'ECONNREFUSED') {
+      addLog(`建议: 连接被拒绝。请检查 Kuma 服务是否在此端口正常运行，或者是否有防火墙拦截。`);
+    } else if (err.message.includes('timeout')) {
+      addLog(`建议: 请求超时。请检查 Kuma 服务响应速度，或网络连通性。`);
+    }
+    res.json({ success: false, logs });
+  }
+});
+
 
 // Start the server
 app.listen(PORT, () => {

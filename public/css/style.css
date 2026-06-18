@@ -466,6 +466,50 @@ button, input, select, textarea {
   box-shadow: 0 6px 15px -3px rgba(59, 130, 246, 0.3);
 }
 
+/* Category Groups under "All" Tab */
+.category-group {
+  margin-bottom: 35px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.category-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  opacity: 0.85;
+  letter-spacing: 0.5px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 4px;
+}
+
+.category-section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  background: var(--primary);
+  border-radius: 99px;
+}
+
+.lock-indicator {
+  font-size: 13px;
+  margin-left: 6px;
+  opacity: 0.6;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.2s ease;
+}
+
+.lock-indicator:hover {
+  opacity: 1;
+}
+
 /* Links Cards Grid */
 .links-grid {
   display: grid;
@@ -1465,3 +1509,40 @@ button, input, select, textarea {
 .dark .site-footer {
   border-top: 1px dashed rgba(255, 255, 255, 0.08);
 }
+
+/* ==========================================================================
+   Uptime Kuma Diagnostic Console Styles
+   ========================================================================== */
+.kuma-debug-box {
+  margin-top: 15px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: #34d399; /* Emerald text */
+  max-height: 250px;
+  overflow-y: auto;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.kuma-debug-logs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kuma-debug-logs li {
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.kuma-debug-logs li.error {
+  color: #f87171; /* Rose red for errors */
+}
+

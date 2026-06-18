@@ -416,6 +416,7 @@ function populateKumaForm() {
   document.getElementById('kuma-url').value = sc.kumaUrl || '';
   document.getElementById('kuma-slug').value = sc.kumaSlug || 'default';
   document.getElementById('kuma-interval').value = sc.kumaInterval || 60;
+  document.getElementById('kuma-ignore-ssl').checked = !!sc.kumaIgnoreSsl;
 }
 
 // --- Save Uptime Kuma Config ---
@@ -428,9 +429,69 @@ async function saveKumaConfig(e) {
   adminData.siteConfig.kumaUrl = document.getElementById('kuma-url').value.trim();
   adminData.siteConfig.kumaSlug = document.getElementById('kuma-slug').value.trim();
   adminData.siteConfig.kumaInterval = parseInt(document.getElementById('kuma-interval').value) || 60;
+  adminData.siteConfig.kumaIgnoreSsl = document.getElementById('kuma-ignore-ssl').checked;
   
   pushDataUpdate();
 }
+
+// --- Uptime Kuma Diagnostics connection test ---
+async function diagnoseKumaConnection() {
+  const kumaUrl = document.getElementById('kuma-url').value.trim();
+  const kumaSlug = document.getElementById('kuma-slug').value.trim();
+  const kumaIgnoreSsl = document.getElementById('kuma-ignore-ssl').checked;
+
+  const container = document.getElementById('kuma-diagnose-container');
+  const logList = document.getElementById('kuma-diagnose-logs');
+  
+  container.style.display = 'block';
+  logList.innerHTML = '<li>[诊断] 正在发送连接测试请求...</li>';
+
+  try {
+    const res = await fetch('/api/admin/kuma/test-connection', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ kumaUrl, kumaSlug, kumaIgnoreSsl })
+    });
+    
+    const data = await res.json();
+    logList.innerHTML = '';
+    
+    if (data.logs && Array.isArray(data.logs)) {
+      data.logs.forEach(log => {
+        const li = document.createElement('li');
+        li.textContent = log;
+        if (log.includes('失败') || log.includes('错误') || log.includes('异常') || log.includes('建议:')) {
+          li.className = 'error';
+        }
+        logList.appendChild(li);
+      });
+    } else {
+      const li = document.createElement('li');
+      li.textContent = `[诊断] 未返回日志数据`;
+      li.className = 'error';
+      logList.appendChild(li);
+    }
+    
+    if (data.success) {
+      showToast('Uptime Kuma 连接测试成功!', 'success');
+    } else {
+      showToast('Uptime Kuma 连接测试失败，请查看日志。', 'error');
+    }
+  } catch (err) {
+    const li = document.createElement('li');
+    li.textContent = `[诊断] 请求失败: ${err.message}`;
+    li.className = 'error';
+    logList.appendChild(li);
+    showToast('连接测试接口通信失败', 'error');
+  }
+}
+
+function clearDiagnoseLogs() {
+  document.getElementById('kuma-diagnose-logs').innerHTML = '<li>[诊断] 日志已清空</li>';
+}
+
 
 // --- Save Visual Theme Settings ---
 async function saveThemeSettings(e) {
@@ -683,6 +744,7 @@ function editLink(id) {
   document.getElementById('link-form-status').value = link.status;
   document.getElementById('link-form-desc').value = link.description || '';
   document.getElementById('link-form-kuma-monitor').value = link.kumaMonitor || '';
+  document.getElementById('link-form-sort').value = link.sortOrder !== undefined ? link.sortOrder : 0;
   
   document.getElementById('modal-link-title').textContent = '修改链接';
   openModal('modal-link');
@@ -697,11 +759,12 @@ function submitLinkForm(e) {
   const status = document.getElementById('link-form-status').value;
   const description = document.getElementById('link-form-desc').value.trim();
   const kumaMonitor = document.getElementById('link-form-kuma-monitor').value.trim();
+  const sortOrder = parseInt(document.getElementById('link-form-sort').value) || 0;
 
   if (id) {
     const idx = adminData.links.findIndex(l => l.id === id);
     if (idx !== -1) {
-      adminData.links[idx] = { ...adminData.links[idx], title, url, categoryId, status, description, kumaMonitor };
+      adminData.links[idx] = { ...adminData.links[idx], title, url, categoryId, status, description, kumaMonitor, sortOrder };
     }
   } else {
     const newLink = {
@@ -712,6 +775,7 @@ function submitLinkForm(e) {
       status,
       description,
       kumaMonitor,
+      sortOrder,
       clicks: 0
     };
     adminData.links.push(newLink);
